@@ -11,23 +11,25 @@ trailing_white = re.compile(b' +\n')
 no_isort_regex = [re.compile(br'^#.*no-isort', flags=re.M), re.compile(br'^ *sys\.path\.append', flags=re.M)]
 
 
+def echo(*args):
+    print(*args, flush=True)
+
+
 def clean_line_endings(p: Path, content: bytes):
-    content, changes = trailing_white.subn('b\n', content)
+    content, changes = trailing_white.subn(b'\n', content)
     if changes:
         p.write_bytes(content)
-        print(f'{p}: {changes} line{"s" if changes > 1 else ""} cleaned')
+        echo(f'{p}: {changes} line{"s" if changes > 1 else ""} cleaned')
 
 
 def main():
+    conf = {}
     auto_check = Path('./.auto-format')
-    if not auto_check.exists():
-        print(f'{auto_check} does not exist, not running', flush=True)
-        return
-
-    try:
-        conf = json.loads(auto_check.read_text())
-    except ValueError:
-        conf = {}
+    if auto_check.exists():
+        try:
+            conf = json.loads(auto_check.read_text())
+        except ValueError:
+            pass
 
     file = sys.argv[1]
     file_path = Path(file)
@@ -36,25 +38,24 @@ def main():
 
     rel_path = file_path.relative_to(Path('.').resolve())
     exclude = conf.get('exclude')
-    # print(exclude, rel_path, flush=True)
     if exclude and str(rel_path) in exclude:
-        print('file excluded from formatting', flush=True)
+        echo(f'file "{rel_path}" excluded from formatting, exclude: {exclude}')
         return
 
-    print(f'running formatting on "{file_path}":', flush=True)
+    echo(f'running formatting on "{file_path}":')
     content = file_path.read_bytes()
-    print('running clean_line_endings:', flush=True)
+    echo('running clean_line_endings:')
     clean_line_endings(file_path, content)
 
     try:
         no_isort = next(r for r in no_isort_regex if r.search(content))
     except StopIteration:
-        print('running isort:', flush=True)
+        echo('running isort:')
         isort_main(['-rc', '-w', '120', file])
     else:
-        print(f'"{no_isort.pattern}" found in file, not running isort', flush=True)
+        echo(f'"{no_isort.pattern}" found in file, not running isort')
 
-    print('running black:', flush=True)
+    echo('running black:')
     black_path = Path(__file__).parent / 'env/bin/black'
     subprocess.run([str(black_path), '-S', '-l', '120', '--target-version', 'py36', file], check=True)
 
