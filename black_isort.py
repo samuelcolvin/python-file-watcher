@@ -11,7 +11,7 @@ trailing_white = re.compile(b' +\n')
 no_isort_regex = [re.compile(br'^#.*no-isort', flags=re.M), re.compile(br'^ *sys\.path\.append', flags=re.M)]
 
 
-def clean_file(p: Path, content: bytes):
+def clean_line_endings(p: Path, content: bytes):
     content, changes = trailing_white.subn('b\n', content)
     if changes:
         p.write_bytes(content)
@@ -21,7 +21,7 @@ def clean_file(p: Path, content: bytes):
 def main():
     auto_check = Path('./.auto-format')
     if not auto_check.exists():
-        print(f'{auto_check} does not exist, not running')
+        print(f'{auto_check} does not exist, not running', flush=True)
         return
 
     try:
@@ -36,22 +36,25 @@ def main():
 
     rel_path = file_path.relative_to(Path('.').resolve())
     exclude = conf.get('exclude')
-    # print(exclude, rel_path)
+    # print(exclude, rel_path, flush=True)
     if exclude and str(rel_path) in exclude:
-        print('file excluded from formatting')
+        print('file excluded from formatting', flush=True)
         return
 
-    print(f'running formatting on "{file_path}"...')
+    print(f'running formatting on "{file_path}":', flush=True)
     content = file_path.read_bytes()
-    clean_file(file_path, content)
+    print('running clean_line_endings:', flush=True)
+    clean_line_endings(file_path, content)
 
     try:
         no_isort = next(r for r in no_isort_regex if r.search(content))
     except StopIteration:
+        print('running isort:', flush=True)
         isort_main(['-rc', '-w', '120', file])
     else:
-        print(f'"{no_isort}" found in file, not running isort')
+        print(f'"{no_isort.pattern}" found in file, not running isort', flush=True)
 
+    print('running black:', flush=True)
     black_path = Path(__file__).parent / 'env/bin/black'
     subprocess.run([str(black_path), '-S', '-l', '120', '--target-version', 'py36', file], check=True)
 
