@@ -5,10 +5,9 @@ import subprocess
 import sys
 from pathlib import Path
 
-from isort.main import main as isort_main
-
 trailing_white = re.compile(b' +\n')
 no_isort_regex = [re.compile(br'^#.*no-isort', flags=re.M), re.compile(br'^ *sys\.path\.append', flags=re.M)]
+root_dir = Path('.').resolve()
 
 
 def echo(*args):
@@ -35,6 +34,8 @@ def main():
     file_path = Path(file)
     if not file_path.exists():
         raise RuntimeError(f'file path does not exist "{file_path}"')
+    if '/site-packages/' in str(file_path):
+        return
 
     rel_path = file_path.relative_to(Path('.').resolve())
     exclude = conf.get('exclude')
@@ -42,22 +43,30 @@ def main():
         echo(f'file "{rel_path}" excluded from formatting, exclude: {exclude}')
         return
 
-    echo(f'running formatting on "{file_path}":')
+    echo(f'running formatting on "{file_path}"...')
     content = file_path.read_bytes()
-    echo('running clean_line_endings:')
+    echo('running clean_line_endings...')
     clean_line_endings(file_path, content)
 
+    env_dir = conf.get('env_dir', 'env')
     try:
         no_isort = next(r for r in no_isort_regex if r.search(content))
     except StopIteration:
-        echo('running isort:')
-        isort_main(['-rc', '-w', '120', file])
+        isort_path = root_dir / env_dir / 'bin/isort'
+        if isort_path.exists():
+            echo('running isort...')
+            subprocess.run([str(isort_path), '-rc', '-w', '120', file], check=True)
+        else:
+            print('isort not installed')
     else:
         echo(f'"{no_isort.pattern}" found in file, not running isort')
 
-    echo('running black:')
-    black_path = Path(__file__).parent / 'env/bin/black'
-    subprocess.run([str(black_path), '-S', '-l', '120', '--target-version', 'py36', file], check=True)
+    black_path = root_dir / env_dir / 'bin/black'
+    if black_path.exists():
+        echo('running black...')
+        subprocess.run([str(black_path), '-S', '-l', '120', '--target-version', 'py37', file], check=True)
+    else:
+        print('black not installed')
 
 
 if __name__ == '__main__':
