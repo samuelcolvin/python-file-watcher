@@ -39,8 +39,9 @@ def main():
 
     rel_path = file_path.relative_to(Path('.').resolve())
     exclude = conf.get('exclude')
-    if exclude and str(rel_path) in exclude:
-        echo(f'file "{rel_path}" excluded from formatting, exclude: {exclude}')
+    str_path = str(rel_path)
+    if exclude and any(re.fullmatch(ex, str_path) for ex in exclude):
+        echo(f'file "{str_path}" excluded from formatting, exclude: {exclude}')
         return
 
     echo(f'running formatting on "{file_path}"...')
